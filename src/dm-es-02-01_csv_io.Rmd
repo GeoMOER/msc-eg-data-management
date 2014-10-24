@@ -1,0 +1,57 @@
+<!---
+Version: "2013-10-23"
+Copyright (C) 2013 Thomas Nauss, GNU GPL (>=3)
+-->
+#### Readading data from csv files
+
+Reading csv files is realized using the `read.table` function from R's utils
+library. The function will return a data frame which contains the information of
+the csv file.
+
+```{r}
+df <- read.table("D:/active/moc/dm/examples/data_raw/wb-db_co2em_1960-2013.csv",
+                 header = TRUE, sep = ",", skip = 2)
+```
+
+As you can see, the `read.table` function gets several arguments. Since this
+is probably the first time you use an R function, let's have a closer look on
+these arguments. The first one gives the filename inclducing the path to the 
+file starting from the level set as working directory. The second argument
+`header = TRUE` tells the function, that the csv file has a header line which is 
+used by `read.table` to name the columns of the returning data frame. The third 
+one `sep = ","` defines the separator of the individual columns in the data 
+frame. Finally, since our csv file has an additional header and an empty line 
+below (in lines 1 and 2), the function should skip the first two lines 
+(`skip = 2`).
+
+A note on the sequence of the arguments: the sequence of the arguments does
+not matter as long as you name them explicetly. If you do not use the argument
+identfier as it is the case for the first argument, the filename, in the example 
+then the sequence matters. To get information on the default sequence and of 
+course the general application of the each R function, type `?<function name>`
+(e.g. `?read.table`) in an R console.
+
+After you executing the `read.table` function above, the content of the csv file is
+stored into a two dimensional data frame called `df`. 
+
+A quick way to check if everything is fine is to display the first few lines of
+the data file using the `head` function.
+```{r}
+head(df,2)
+```
+
+#### Writing data to csv files
+Writing data is as easy as reading it. Just use the `write.table` function.
+```{r}
+write.table(df, file = "D:/active/moc/dm/examples/data_procd/test.csv", 
+            sep = ";", dec = ",")
+```
+The example above also illustrates another argument called `dec` which defines
+the decimal point. In addition, the parameter for the `sep` argument is ";"
+which causes the new csv file to have ";" instead of "," as a separator. This
+would be a good idea for German csv files which use the "," as decimal sign but 
+to put this straight: CSV means comma separated values so just use "," as a 
+separator and "."  as decimal point. 
+
+For more information have a look at e.g. the respective [data importing](http://www.statmethods.net/input/importingdata.html) and [data exporting](http://www.statmethods.net/input/exportingdata.html) site at Quick R, have a look into the package 
+documentation or search the web.
