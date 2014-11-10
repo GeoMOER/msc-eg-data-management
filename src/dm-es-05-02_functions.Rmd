@@ -1,0 +1,124 @@
+<!---
+Version: "2013-10-23"
+Copyright (C) 2013 Thomas Nauss, GNU GPL (>=3)
+-->
+Functions should be used if certain procedures are recycled within or across
+scripts. To define a function, the `fuction` class is used.
+
+##### General structure
+A very simpel function must include the class name followed by an empty list
+of parameters:
+```{r}
+simpleFunction <- function(){
+  print("I am a simple function")
+}
+simpleFunction()
+```
+The last line executes the function and will look very familiar to you since you 
+already know many functions like `read.table`, `rowSums` or `if`. Even `+` and 
+all other arithmetic operations are functions.
+
+Keep in mind that since R is an interpreter language, you will have to define 
+the function above the first call or in another script which is imported in
+the begining. The latter is realized by the `source` function. Imagin that the
+above function would be in a file called "simpleFunction.R" which is stored in
+your working directory. Then you can load this function using the following
+statement:
+
+```{r, eval=FALSE}
+source("simpleFunction.R")
+```
+
+##### Using external variables inside a function
+If you want to use a variable defined outside the function within it, one (bad)
+option would be to adress it directly. Here's an example (you should not 
+remember!):
+```{r}
+simpleFunction <- function(){
+  print("I am a simple function which prints the content of a variable:")
+  print(test)
+}
+test <- "Content of variable test"
+simpleFunction()
+```
+
+As a general rule, never use anything inside a function from the outside except
+you explicitly supply it through the function call. So the above example should
+be implemented like the following:
+```{r}
+simpleFunction <- function(content){
+  print("I am a simple function which prints the content of a variable:")
+  print(content)
+}
+test <- "Content of variable test"
+simpleFunction(test)
+```
+In this case, the string stored in variable `test` is given to the variable 
+`content` which is used within the function's print statement.
+
+##### Return a variable from a function
+A function generally returns whatever the last line executed within the function
+would return. Hence, in the above example, the function would return the last 
+print statement. Let's proof that first:
+```{r}
+return_variable <- simpleFunction(test)
+return_variable
+```
+Although this might save a couple of characters of your code, it is not good
+practice. Therefore, if you want to return something from a function, 
+explicitly use the `return` statement. 
+
+Let's say you have a function which converts character vectors to lower case and 
+numeric vectors to the square root. To return the results of this function, one 
+implementation could look like like that:
+```{r}
+conversion <- function(element){
+  if(is.character(element)){
+    return(tolower(element))
+    }    else if(is.numeric(element)){
+      return(sqrt(element))
+      }
+  }
+```
+Let's execute the function:
+
+```{r}
+a <- c("A", "B", "C", "A", "B", "A", "A")
+c <- c(1, 2, 3, 4, 5, 6, 7)
+result <- conversion(a)
+result
+result <- conversion(c)
+result
+```
+It obviously works. Of course you can also store the result in a variable first
+before returning it, e.g. if you want to have an even more clean code structure
+or if you want to print or write something in the end.
+```{r}
+conversion <- function(element){
+  if(is.character(element)){
+    temp <- tolower(element) 
+    print(paste0("Element ", element, " is converted to ", temp, "\n"))
+    return(temp)
+    }    else if(is.numeric(element)){
+      temp <- sqrt(element)
+      print(paste0("Element ", element, " is converted to ", temp))
+      return(temp)
+      }
+  }
+result <- conversion(a)
+result
+```
+##### Modifying a variable supplied to a function
+This is very easy since it is not possible:-). Just for the record:
+```{r}
+willNotChangeAnOutsideVariableCalledVariable <- function(){
+  variable <- variable + 5
+  return(variable)
+  }
+variable <- c(1,2,3,4,5)
+willNotChangeAnOutsideVariableCalledVariable()
+variable
+```
+While variables existing outside a function can be used within a function, variables
+having the same name as an outside variable only exist inside the function, not
+outside.

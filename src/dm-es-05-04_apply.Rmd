@@ -1,0 +1,181 @@
+<!---
+Version: "2013-10-23"
+Copyright (C) 2013 Thomas Nauss, GNU GPL (>=3)
+-->
+
+As examples for the apply family we shortly introduce `apply` before turning to
+`lapply`.
+
+##### Apply
+The `apply` function applies a user-defined function to each element within rows
+or columns of a 2D data type like a data frame. Therefore, one has to 
+define a function first.
+```{r}
+myFunction <- function(element){
+  if(is.character(element)){
+    return(tolower(element))
+    } else if(is.numeric(element)){
+      return(sqrt(element))
+      }
+  }
+```
+This function should convert a character element to lower case characters and 
+a numeric element to its square root. Let's apply that to  a data frame via 
+the `apply` function.
+```{r}
+a <- c("A", "B", "C", "A", "B", "A", "A")
+b <- c("X", "X", "X", "X", "Y", "Y", "Y")
+c <- c(1, 2, 3, 4, 5, 6, 7)
+d <- c(10, 20, 30, 40, 50, 60, 70)
+df <- data.frame(Cat1 = a, Cat2 = b, Val1 = c, Val2 = d)
+result <- apply(df, 2, myFunction)
+result
+```
+Obviously, the character part of the function returns the expected result. The
+numeric part however does not return the square root. The reason for this
+behaviour is that the apply function converts our data frame to a matrix first.
+Since this matrix has characters and numerical values, all data types are 
+converted to characters since this is the less restrictive data type.
+
+Keep that in mind if you want to use apply!
+
+Although the result above looks like a data frame, it is a matrix.
+```{r}
+class(result)
+```
+To get a data frame, we need to apply the already known `as.data.frame` function.
+The second line will convert the factors of the numeric columns back to numeric
+so we finally have what we were looking for.
+```{r}
+result <- as.data.frame(result)
+class(result)
+```
+
+##### Basic structure of lapply using vectors as return elements
+The `lapply` function is your workhorse when it comes to loops over data frames.
+It will return a structured list with one return statement per sub-entry.
+
+Let's try the same as above but using `lapply`. Since this time, the data frame
+is not converted to a matrix and columns Cat1 and Cat2 are factors not characters,
+we have to change the `is.character` statement to `is.factor`
+```{r}
+myFunction <- function(element){
+  if(is.factor(element)){
+    return(tolower(element))
+  } else if(is.numeric(element)){
+    return(sqrt(element))
+  }
+}
+
+result <- lapply(df, myFunction)
+result
+```
+It obviously works now. The lapply function passes one column at a time to 
+`myFunction` and the latter returns a character or numeric vector. 
+To get a data frame back from the structured list, one more line of code is 
+necessary:
+```{r}
+result <- as.data.frame(result)
+result
+str(result)
+```
+
+##### Defining functions within the lapply statement
+While a user-defined function has to be provided prior to the call of an `apply` 
+function, the function can also be defined within the call for the `lapply`
+function. The latter is a common procedure since most of the time, the functions
+are so special or require additional information
+
+Let's look at this type of solution. Instead of defining the function a priory, we
+will define it as part of the `lapply` function which is a quite common procedure.
+The reason for this is that most of the time the function is quite specific and 
+sometimes uses the name of a data frame or other variables, too. If one would 
+like to include that into a more general function, more function attributes are
+necessary (see the examples on functions).
+
+So let's handle the same problem as above but this time without a previous 
+defined function:
+```{r}
+result <- lapply(df, function(x){
+  if(is.factor(x)){
+    return(tolower(x))
+  } else if(is.numeric(x)){
+    return(sqrt(x))
+  }
+})
+result <- as.data.frame(result)
+str(result)
+```
+
+If one additionally wants to include other variables defined outside the loop,
+no problem. Since this type of function definition can not be resused outside 
+the loop anyway, one can just pass any variable from outside the loop to the 
+inside. Here is one example for Val2:
+```{r}
+result <- lapply(df, function(x){
+  if(is.factor(x)){
+    return(tolower(x))
+  } else if(is.numeric(x)){
+    comp_result <- sqrt(x) * df$Val2
+    return(comp_result)
+  }
+})
+result <- as.data.frame(result)
+result
+```
+
+##### Using variables defined outside the lapply loop
+Regarding the utilization of variables defined outside the loop within the loop,
+one special case must be kept in mind: it is not possible to change any variable
+defined outside the loop except you completely overwrite it with the apply 
+function (i.e. if you want to overwrite `test` you have to replace the variable
+`result` with the variable name `test`). Here is one example:
+```{r}
+test <- 1
+result <- lapply(df, function(x){
+  if(is.factor(x)){
+    test <- tolower(x)
+    return(test)
+  } else if(is.numeric(x)){
+    df <- sqrt(x) * df$Val2
+    return(df)
+  }
+})
+result <- as.data.frame(result)
+df
+test
+```
+Although `test` is used as variable name for the lower case conversion and `df`
+is used for the numeric computation, the content of the variables outside the 
+loop has not changed.
+
+Hence, if you realy want to change the content of a variable defined outside
+the loop, use a `for` loop instead of `apply`.
+
+##### Returning data frames within the lapply loop
+One last but important and heavily utilized procedure: In the above examples, the
+function used within `lapply` returns a vector which allows an easy conversion
+of the overall returned nested list from the `lapply` function by using
+the `as.data.frame` function. In many cases, your function will return a data 
+frame not a vector which makes the conversion a tiny bit more complicated.
+
+Here is an example. In this case we combine columns Cat1 and Cat2 as well as 
+Val1 and Val2 into new columns. Therefore it is feasable to change the 
+control statement of the `apply` function, too so it gives us the number of the
+individual rows (please note that this example can easily realized without any
+loop so take it just as an illustration):
+```{r}
+result <- lapply(seq(nrow(df)), function(x){
+  new_structure <- data.frame(Col1 = paste(df[x,1], df[x,2]),
+                              Col2 = df[x,3] * df[x,4])
+  return(new_structure)
+})
+str(result)
+```
+The result is a structured list with a data frame within each list element. To
+build an overall data frame one basically just has to copy each row of the 
+individual data frames below each other. This is done by the following statement:
+```{r}
+result <- do.call("rbind", result)
+str(result)
+```

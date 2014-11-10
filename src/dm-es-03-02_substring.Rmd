@@ -62,3 +62,6 @@ substring(v, regexpr(" ", v)+1, nchar(v))
 ```
 For more informatino on the `regexpr` and similar functions, have a look at
 the help page (i.e. `?regexpr`).
+
+For an overview of regular expressions which e.g. match any digit or 
+alphabetic character see `?regex`.

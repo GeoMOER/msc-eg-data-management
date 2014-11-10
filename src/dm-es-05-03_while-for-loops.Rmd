@@ -1,0 +1,137 @@
+<!---
+Version: "2013-10-23"
+Copyright (C) 2013 Thomas Nauss, GNU GPL (>=3)
+-->
+While and forloops are repeating structures which enable the execution of 
+certain code blocks for multiple times. While loops are usefull if the number of
+necessary repititions is not known at the starting time of the loop. For loops
+are usefull if the number of necessary repititions is known at the starting time
+of the loop (which is not necessarily the starting time of the program!).
+
+##### While loops
+While loops are executed until a termination condition is reached. In the 
+following example, this condition is given by `a > b`:
+```{r}
+a <- 7
+b <- 10
+while(a <= b){
+  print(a)
+  a <- a + 1
+}
+```
+Obviously, this condition is executed 4 times (i.e. a = 7, 8, 9, 10). After that
+`a + 1` gives 11 which is larger than b and the termination condition is reached.
+
+As for any other loop, nested loops are also possible.
+```{r}
+a <- 7
+b <- 10
+c <- 10
+while(a <= b){
+  print(paste0("Outer loop value of a: ", a))
+  while(c > a){
+    print(paste0("   Inner loop value of c: ", c))
+    c <- c - 1 
+  }
+  c <- 10
+  a <- a + 1
+  
+}
+```
+Variable `c` has to be reseted to its initial value every time the inner loop
+is completed. Otherwise it would not start a second time since the termination
+condition is already reached. Of course this behaviour can also be usefull for
+a variety of problems.
+
+##### For loops
+In for loops, the number of repeated executions is given at the start time either
+by a variable which is defined during the runtime of the previous code or by
+a constant supplied by the programmer. Imaging that we know already how many
+times the first while loop in the examples above has to be repeated, one can
+implement the same behaviour with this for loop:
+```{r}
+for(a in seq(7,10)){
+  print(a)
+}
+```
+Note that - in contrast to the while loop - the variable `a` which controls the
+for loop must not be changed within the loop.
+
+A for loop for the same behaviour of the second while loop example would be:
+```{r}
+for(a in seq(7, 10)){
+  print(paste0("Outer loop value of a: ", a))
+  if(a < 10){
+    lower_border <- a + 1
+  } else {
+    lower_border <- a
+  }
+  for(c in seq(10, lower_border)){
+    print(paste0("   Inner loop value of c: ", c))
+  }
+}
+```
+As you can easily see, this loop looks much more complicated than the while loop
+above. The reason for the if-else statement is that the second loop must run from
+`c` to the integer value just larger than `a` (i.e. 8, 9, 10). Therefore, `a`
+must be increased by 1 if it is smaller than 10 but stay 10 if it equals 10.
+
+Instead of defining the number of repititions in the for loop statement, one can
+also use e.g. a vector or data frame column/row. Two options are possible for this
+case. The first uses the length of the vector as part of the sequence. This is
+basically the same as the examples above except we do not define the number
+explicitely:
+```{r}
+a <- c("A", "B", "C", "D")
+for(elements in seq(length(a))){
+  print(elements)
+}
+```
+A more interesting application would be that one does not use the lenght of the
+data type but its content as the looping variable:
+```{r}
+for(elements in a){
+  print(elements)
+}
+```
+
+##### Building a data type in a loop
+The above examples show the principal structure of the while and for loops. If
+you want to build a variable within such loops which can be used later, you have
+to define it first outside the looop. 
+
+For example, if you want to convert the elements of vector a to lower case and
+store the results in another vector, the following would be necessary:
+```{r}
+test <- character()   # this is an empty character vector
+for(elements in a){
+  test <- c(test, tolower(elements))
+}
+test
+```
+Please note that (i) this example can of course easily implemented without a 
+loop so just take it as a simple illustration and (ii) that extending the 
+vector within the loop can become quite time consuming. The latter is the reason
+why apply loops generally become much faster than for loops if large data sets
+are returned. Of course this can also be solved by defining not an empty vector
+but a vector which acutaly has the desired lenght. In such a case, the for loop
+has to be changed so we have an index which gives us the position of the actual
+processed element in the resulting vector :
+```{r}
+test <- character(length(a))   # this is an empty character vector of length a
+for(i in seq(length(a))){
+  test[i] <- tolower(a[i])
+}
+test
+```
+
+##### Modifying an existing variable in a loop
+If you want to modify a existing variable, while and for loops are the only 
+option (i.e. you can not use `apply`). Aside from that restriction, it is a
+straight forward task. Let's just add an "x" to each entry of variable a:
+```{r}
+for(i in seq(length(a))){
+  a[i] <- paste0(a[i], "x")
+}
+a
+```
