@@ -1,0 +1,37 @@
+<!---
+Version: "2013-10-23"
+Copyright (C) 2013 Thomas Nauss, GNU GPL (>=3)
+-->
+
+The following plotting examples will revisit R's generic plotting functions
+and pimp them up a little bit. We will not go into details since if you really
+want to visualize your data as heatmap, use lattice or ggplot2. 
+
+The underlaying example data is taken from our combined natural disaster and 
+Ebola data set which is loaded in the background into the data frame called df. 
+We will generally not interpret the plots but just look at formal aspects.
+
+```{r, echo=FALSE, warning=FALSE}
+df <- read.table(
+  "D:/active/moc/dm/examples/data_procd/em-dat_disasters_1900-2014_sorted.csv", 
+  header = TRUE, sep = ",")
+# str(df)
+```
+
+Prior to plotting the heat map, we need to make create a matrix which contains 
+the desired information. In our case we want to visualize the number of 
+disasters per year per disaster group. To get the data set we can use the table
+function applied to columsn year and disaster.group of our original data frame.
+The function alligns the groups and years column and row lables and counts the
+number of events per year.
+
+After transforming the data using a square root function (for a better value and
+hence color stretch in the heat map), we produce it using the `heatmap` function:
+```{r}
+data <- table(df$year, df$disaster.group)
+head(data)
+data <- data^0.5^2
+
+heatmap(data, Rowv = NA, Colv = NA, margins = c(5,5), 
+        scale = "column", cexCol=0.75)
+```
