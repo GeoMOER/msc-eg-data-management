@@ -1,0 +1,161 @@
+<!---
+Version: "2013-10-23"
+Copyright (C) 2013 Thomas Nauss, GNU GPL (>=3)
+-->
+
+The following plotting examples are the lattice version of the above generic 
+plotting functions and are also pimped where necessary.
+
+The underlaying example data is again taken from our combined natural disaster and 
+Ebola data set which is loaded in the background into the data frame called df. 
+We will generally not interpret the plots but just look at formal aspects.
+
+```{r, echo=FALSE, warning=FALSE}
+df <- read.table(
+  #"D:/active/moc/dm/examples/data_procd/em-dat_disasters_1900-2014_sorted.csv", 
+  "/home/ede/tappelhans/uni/marburg/lehre/2014/ws/msc_dm/data/em-dat_disasters_1900-2014_sorted.csv", 
+  header = TRUE, sep = ",")
+# str(df)
+```
+
+
+##### Multiple plots in one
+In the following example, we will again visualize the number of totally affected 
+people against the time line. The aggregation looks like this:
+```{r}
+library(latticeExtra)
+dfa <- aggregate(df$total_affected, by = list(df$disaster.group, df$year), FUN = sum)
+colnames(dfa) <- c("disaster.group", "year", "total_affected")
+```
+
+The lattice version of our previous example looks like this:
+```{r}
+xyplot(dfa$total_affected ~ dfa$year, 
+     xlab = "Year", ylab = "Affected persons",
+     main = "Log of persons affected by natural disasters from 1900 to 2013",
+     col = "red", fill = "blue", pch = 21,
+     scales = list(y = list(log = 10)),
+     yscale.components = yscale.components.log10ticks)
+```
+
+Let's plot the same data but this time using different colors for the different
+desaster groups. To do so, we first define a variable containing the individual
+disaster group values:
+```{r}
+groups <- unique(dfa$disaster.group)
+groups
+```
+As one can see, we have three different groups. Hence, we need three different 
+colors which we define now:
+```{r}
+colors <- c("red", "green", "blue")
+```
+
+In order to recreate the generic base graphics version of the multi-colour plot
+with different colours for each desaster type in lattice, we need to approach 
+this a little differently. Instead of producing an empty plot and then adding
+points, in lattice we create one plot for each sub-group which we then plot
+on top of each other in a layered fashion. For this, we first need to create a 
+list will all the plotting object needed for the final layered plot. We do this
+usng an `lapply()`-loop. Note that we already add a legend (key) to each 
+individual plot.
+
+```{r}
+plot_list <- lapply(seq(groups), function(i) {
+  xyplot(dfa$total_affected[dfa$disaster.group == groups[i]] ~
+         dfa$year[dfa$disaster.group == groups[i]],      
+       xlab = "Year", ylab = "Affected persons",
+       main = "Log of persons affected by natural disasters from 1900 to 2013",
+       col = colors[i], fill = colors[i], pch=21,
+       scales = list(y = list(log = 10)),
+       yscale.components = yscale.components.log10ticks,
+       key = list(points = list(pch = rep(21, 3), 
+                                col = colors,
+                                fill = colors),
+                  text = list(labels = as.character(groups)), 
+                  x = 0.05, y = 0.95, corner = c(0, 1)))
+  })
+```
+
+Now we have created a plot for each desaster group, e.g. for the 3rd desaster 
+group (Complex Desasters) we could now simply call the 3rd element of our 
+plot list:
+
+```{r}
+plot_list[[3]]
+```
+
+In order to combine these individual plots into one plot, the `latticeExtra` 
+package provides the `layer()` function which lets you add layers to existing plots.
+However, in order to not have too many `layer()` calls we will use another 
+function called `latticeCombineLayer()` which is part of an R package developed
+by us at Environmental Informatics Marburg. To install this 
+package copy the following code into your console:
+
+```{r, eval = FALSE}
+install.packages('devtools')
+library(devtools)
+install_github("environmentalinformatics-marburg/Rsenal")
+```
+
+Now we can load this package and use the function to combine multiple plots 
+into one:
+
+```{r}
+library(Rsenal)
+latticeCombineLayer(plot_list)
+```
+
+
+##### Multiple plots on one page
+So far we had one plot per page. In lattice we can use the `|` formula argument
+to provide a grouping variable so that the solution looks like this (again using
+the customised theme and adjusting the ylabels to reflect the logarithmic nature):
+
+```{r, fig.width = 10, fig.height = 10}
+bw_theme <- trellis.par.get()
+bw_theme$box.dot$pch <- "|"
+bw_theme$box.dot$cex <- 3
+bw_theme$box.rectangle$col <- "black"
+bw_theme$box.rectangle$lwd <- 2
+bw_theme$box.rectangle$fill <- "white"
+bw_theme$box.umbrella$lty <- 1
+bw_theme$box.umbrella$col <- "black"
+bw_theme$plot.symbol$col <- "grey40"
+bw_theme$plot.symbol$pch <- "*"
+bw_theme$plot.symbol$cex <- 2
+
+ndigits <- nchar(as.character(max(df$total_affected)))
+ylabls <- 10^(0:ndigits)
+
+# transform the power of then values above analogous to the data values
+ytics <- ylabls^(0.5)^3
+
+df$total_affected_sqrt3 <- df$total_affected^0.5^3
+bwp <- bwplot(total_affected_sqrt3 ~ region | disaster.group, data = df,    
+              scales = list(x = list(rot = 90), 
+                            y = list(at = ytics, labels = ylabls)),
+              main = "People affected by different disaster types",
+              par.settings = bw_theme, layout = c(1, 3))
+print(bwp)
+```
+
+Note that by default lattice provides sensible axis labelling out of the box.
+So there is no need to adjust these. Also not that y axes are labelled alternatingly
+on the left an right side of the plot. This is a matter of choice and personal
+preference. Some people do not like this, but I find it rather helpful. In any way,
+this can be changed.
+
+Note also, that in the last code chunk we stored our plot in an object. Yes, just
+like any vector or any other data type, lattice lates you store plots in objects.
+This is the main advantage over the base graphics system, as it lets us quickly 
+modify existing plots without the need to re-code everything from scratch. For 
+this we can use the `update()` function. So if we wanted to change the colours of 
+the boxes, we would simply type:
+
+```{r, fig.width = 10, fig.height = 10}
+clrs <- colors(1)[1:length(unique(df$region))]
+
+update(bwp, fill = clrs)
+```
+

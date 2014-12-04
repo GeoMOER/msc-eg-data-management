@@ -1,0 +1,47 @@
+<!---
+Version: "2013-10-23"
+Copyright (C) 2013 Thomas Nauss, GNU GPL (>=3)
+-->
+
+The following plotting examples will revisit R's generic plotting functions
+and pimp them up a little bit. We will not go into details since if you really
+want to visualize your data as heatmap, use lattice or ggplot2. 
+
+The underlaying example data is taken from our combined natural disaster and 
+Ebola data set which is loaded in the background into the data frame called df. 
+We will generally not interpret the plots but just look at formal aspects.
+
+```{r, echo=FALSE, warning=FALSE}
+df <- read.table(
+  #"D:/active/moc/dm/examples/data_procd/em-dat_disasters_1900-2014_sorted.csv", 
+  "/home/ede/tappelhans/uni/marburg/lehre/2014/ws/msc_dm/data/em-dat_disasters_1900-2014_sorted.csv", 
+  header = TRUE, sep = ",")
+# str(df)
+```
+
+As before, we need to create a matrix which contains 
+the desired information. In our case we want to visualize the number of 
+disasters per year per region. To get the data set we can use the table
+function applied to column year and region of our original data frame.
+The function aligns the regions and years column and row lables and counts the
+number of events per year.
+
+After transforming the data using a square root function (for a better value and
+hence color stretch in the heat map), we produce it using the `levelplot()` function.
+This function is the default to be :
+```{r, fig.width = 12, fig.height = 10}
+library(latticeExtra)
+data <- table(df$year, df$region)
+head(data)
+data <- data^0.5^2
+
+clrs_hcl2 <- function(n) {
+  hcl(h = seq(0, 260, length.out = n), 
+      c = 60, l = seq(10, 90, length.out = n), 
+      fixup = TRUE)
+  }
+
+levelplot(data, asp = 0.5, scales = list(x = list(rot = 90)), 
+          xlab = "", ylab = "", col.regions = clrs_hcl2(100),
+          colorkey = list(space = "top", width = 1, height = 0.75))
+```

@@ -1,0 +1,80 @@
+<!---
+Version: "2013-10-23"
+Copyright (C) 2013 Thomas Nauss, GNU GPL (>=3)
+-->
+
+The following plotting examples are the lattice version of the above generic 
+plotting functions and are also pimped where necessary.
+
+The underlaying example data is again taken from our combined natural disaster and 
+Ebola data set which is loaded in the background into the data frame called df. 
+We will generally not interpret the plots but just look at formal aspects.
+
+```{r, echo=FALSE, warning=FALSE}
+df <- read.table(
+  "/home/ede/tappelhans/uni/marburg/lehre/2014/ws/msc_dm/data/em-dat_disasters_1900-2014_sorted.csv", 
+  header = TRUE, sep = ",")
+# str(df)
+```
+
+The lattice version of the generic simple boxplot of our square root transformed 
+total number of affected can be produced as follows - the equivalent for `boxplot()`
+in lattice is `bwplot()`:
+```{r}
+library(latticeExtra)
+df$total_affected_sqrt3 <- df$total_affected^(0.5)^3
+bwplot(total_affected_sqrt3 ~ region, data = df, 
+       scales = list(x = list(rot = 90)))
+```
+
+Note that in order to modify the axes, lattice provides an argument called `scales`.
+In general, lattice stores and retrieves pretty much all its settings through 
+lists, so that we need to provide a list to the `scales` argument. And furthermore, 
+we also need to provide a list of graphical parameter settings for eeach of the 
+x and y axes as lists. With this we can reproduce the cube root adjusted y axis labels 
+from the generic version produced earlier:
+```{r}
+# get maximum value as power of 10 (by counting digits of the max value)
+# and create a vector of these powers starting with 10^0
+ndigits <- nchar(as.character(max(df$total_affected)))
+ylabls <- 10^(0:ndigits)
+print(ylabls)
+
+# transform the power of then values above analogous to the data values
+ytics <- ylabls^(0.5)^3
+
+# plot the boxplot with modified y axis
+bwplot(total_affected_sqrt3 ~ region, data = df, 
+       scales = list(x = list(rot = 90), 
+                     y = list(at = ytics, labels = ylabls)))
+```
+
+I don't know about you, but I surely do not like the defauölt look of lattice
+boxplots. This is, however, easy to change. As I said before, lattice stores
+all its graphical settings in a list. The default list can be assessed using 
+a function called `trellis.par.get()`. With this function we can create our own 
+modified version of graphical settings and use those when plotting our boxplot:
+
+```{r}
+bw_theme <- trellis.par.get()
+bw_theme$box.dot$pch <- "|"
+bw_theme$box.dot$cex <- 3
+bw_theme$box.rectangle$col <- "black"
+bw_theme$box.rectangle$lwd <- 2
+bw_theme$box.rectangle$fill <- "white"
+bw_theme$box.umbrella$lty <- 1
+bw_theme$box.umbrella$col <- "black"
+bw_theme$plot.symbol$col <- "grey40"
+bw_theme$plot.symbol$pch <- "*"
+bw_theme$plot.symbol$cex <- 2
+
+bwplot(total_affected_sqrt3 ~ region, data = df, 
+       scales = list(x = list(rot = 90), 
+                     y = list(at = ytics, labels = ylabls)),
+       par.settings = bw_theme)
+```
+
+Do you realise how we produce a `bw_theme` object through `trellis.par.get()`
+of which we then modify several settings in order to get a much more pleasant
+result. This modified graphics setting list (it is a list, you can test using `str`)
+is then passed to the `par.settings` argument in the `bwplot()` call.
