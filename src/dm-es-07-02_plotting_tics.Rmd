@@ -12,7 +12,8 @@ We will generally not interpret the plots but just look at formal aspects.
 
 ```{r, echo=FALSE, warning=FALSE}
 df <- read.table(
-  "D:/active/moc/dm/examples/data_procd/em-dat_disasters_1900-2014_sorted.csv", 
+  #"D:/active/moc/dm/examples/data_procd/em-dat_disasters_1900-2014_sorted.csv", 
+  "/home/ede/tappelhans/uni/marburg/lehre/2014/ws/msc_dm/data/em-dat_disasters_1900-2014_sorted.csv",
   header = TRUE, sep = ",")
 # str(df)
 ```
