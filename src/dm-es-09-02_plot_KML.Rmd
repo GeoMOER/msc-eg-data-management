@@ -1,0 +1,23 @@
+---
+output: html_document
+---
+
+
+The following example shows how one can easily create a KML file to visualize 
+vector data in Google earth. The same vector datasets as in the I/O example 
+is taken.
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results="hide"}
+library(rgdal)
+setwd("D:/active/moc/dm/examples/data_procd/spatial_data/")
+vector <- readOGR("data_2014_subset1.shp", layer = "data_2014_subset1")
+```
+
+Creating a KML file is straight forward. Just use the `plotKML` function of the
+plotKML library and hend your vector over to the function. In order to visualize
+a certain attribute, pass the attribute within []. If your vectors should not be
+labled by this attribute but by some other attribute, supply it by the parameter
+points_names.
+```{r}
+library(plotKML)
+plotKML(vector["COVRG"], points_names = vector@data$ID)
+```

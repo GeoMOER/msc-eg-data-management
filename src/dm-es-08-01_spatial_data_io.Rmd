@@ -1,0 +1,129 @@
+---
+output: html_document
+---
+
+
+The following examples illustrate the preprocessing of spatial data sets using
+the sp and raster package.
+
+As always, we start with importing the packages and setting the working
+directory.
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results="hide"}
+library(raster)
+library(sp)
+library(rgdal)  # Necessary to read vector files when reading with sp
+
+setwd("D:/active/moc/dm/examples/data_procd/spatial_data/")
+```
+
+#####  Vector data sets I/O
+A standard exchange format for vector data sets is the ESRI shape format. The
+shape "file" is actually not a single file but a group of files with the same
+name but different extensions. To load a vector data set into R, the name of
+the actual shape file (i.e. extension "shp") has to be supplied. In addition,
+the layer name must be given to the function. In 99.99% of all cases, this 
+layer name is just the file name.
+
+For reading a vector data set, the `readOGR` function of the sp package is used:
+```{r}
+print(getwd())
+vector <- readOGR("data_2014_subset1.shp", layer = "data_2014_subset1")
+```
+As one can see from the short information return of the function, the example file
+was of type polygon with 161 points (i.e. features) and 6 attribute values per
+point.
+
+What you get from readOGR is some kind of spatial data frame. Since this is a
+point vector, it will be a spatial point data frame:
+```{r}
+class(vector)
+```
+
+If projection information has been supplied to the shape file (i.e. if a consistent
+prj file is part of the data set), the projection information has already been
+stored in the spatial data frame. This can be checked (or accessed) by using the
+`projection` function:
+```{r}
+projection(vector)
+```
+
+If you want to write a spatial vector data frame to your disk, just use the
+`writeOGR` function:
+```{r}
+writeOGR(vector, "new_data_set.shp", layer = "new_data_set", 
+         driver = "ESRI Shapefile", overwrite_layer=FALSE)
+```
+As driver, any of the GDAL drivers can be used. Personally, I vote for the default
+of attribute overwrite_layer which is FALSE (and hence you can neglect it) in
+order to ensure that existing data is not overwritten accidentially.
+
+
+#####  Raster data set I/O
+A standard exchange format for raster data sets is the GeoTiff format. As for 
+other GIS data formats, it supplies meta information on its corner coordinates and
+also its reference system. 
+```{r}
+raster <- raster("LC82100502014328LGN00_B5.tif")
+projection(raster)
+```
+To write a raster, use the `writeRaster` function:
+```{r}
+writeRaster(raster, "new_raster.tif", "GTiff", overwrite = FALSE)
+```
+
+
+#####  Multiple raster data sets I/O
+Many task require the reading of multiple raster data sets. Assuming that they
+have all the same projection, extend and resolution, individual rasters can 
+be combined to stacks using the `stack` function. The combination can be based
+on individual rasters readily available in memory or raster data sets which
+are not loaded (but will be as part of the function). This function can also handle
+the i/o of multi-layer raster files which is common for RGB composits.
+```{r}
+landsat <- stack(raster, "LC82100502014328LGN00_B1.tif", 
+                 "LC82100502014328LGN00_B2.tif", "LC82100502014328LGN00_B3.tif")
+projection(landsat)
+```
+Tip: the `resample` or `projectRaster` function can help you in achiving that
+all raster layers have the same projection and internal geometry.
+
+
+##### XYZ data I/O
+If geo-datasets do not come as vectors or rasters but as csv files, it is no
+problem to convert the resulting data frame from the `read.table` function to
+a spatial data frame as long as you can supply an x (i.e. easing) and y (i.e.
+northing) coordinate for each row of the data frame.
+
+In the following example, the x and y coordinates are already part of the csv
+file.
+```{r}
+xyz <- read.table("plots_veg_anm_geo_2014.csv", header=TRUE, sep=",")
+```
+
+Since this is a plain csv file, there is no projection information available.
+```{r}
+projection(xyz)
+```
+In order to convert the data frame to a spatial data frame, we first have to
+supply easting and northing coordinates for each row. In the example at hand,
+the coordinates are given in columns "Lon" and "Lat".
+```{r}
+coordinates(xyz) <- ~Lon+Lat
+```
+Finally, the projection has to be defined. In this case, the data comes from a GPS
+device with standard latitude and longitude (i.e. WGS84) settings. The EPSG code
+for that is 4326 and the proj4 string is as follows:
+```{r}
+projection(xyz) <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+class(xyz)
+```
+Now, the spatial points data frame can be handled as any other.
+
+Of course, the other way round is also possible for any kind of spatial vector
+data frame:
+```{r}
+xyz <- as.data.frame(xyz)
+class(xyz)
+```
+The resulting data frame has two additional columns x and y which contain the
+easting and northing positions. These will always be added to the data frame.

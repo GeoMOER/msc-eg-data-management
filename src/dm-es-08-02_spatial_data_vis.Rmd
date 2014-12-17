@@ -1,0 +1,94 @@
+---
+output: html_document
+---
+
+
+The following examples show how one can access data values of geospatial datasets 
+and how basic visualization can be done. The same vector and raster datasets as
+in the I/O example are taken.
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results="hide"}
+library(raster)
+library(sp)
+library(rgdal)
+library(latticeExtra)
+
+setwd("D:/active/moc/dm/examples/data_procd/spatial_data/")
+vector <- readOGR("data_2014_subset1.shp", layer = "data_2014_subset1")
+raster <- raster("LC82100502014328LGN00_B5.tif")
+```
+
+#####  Accessing values in spatial data frames
+To access the attribute values of a spatial vector data frame, one has to 
+access the "data" section of the variable. This is done using the @ symbol:
+```{r}
+str(vector@data)
+```
+Aside from that, everything else is just as for the data frames. Here are some
+examples:
+```{r}
+head(vector@data$ID)
+vector@data[1:3, ]
+```
+In order to access values of a raster layer, one can use the index values of
+rows and columns directly. Again some examples:
+```{r}
+raster[5, 6]   # Grid/pixel value of row 5 and column 6
+raster[5:6, 6:7]   # Grid/pixel value of r5/c6, r5/c7, r6/c5, r6/c7
+```
+In order to get all values from the raster in the correct geometry, one has
+two options:
+```{r}
+option1 <- raster[,]
+option2 <- getValues(raster)
+identical(option1, option2)
+```
+
+#####  Basic visualization
+Basic visualization of a raster or vector geo-dataset is very simple. For raster
+data, you can use the `plot` function or the `spplot` function which is based 
+on lattice.
+```{r}
+plot(raster)
+spplot(raster)
+```
+Simple enough but although this example should just illustrate the basic plooting,
+let's change at least the color scheme of the ssplot. We use the standard pallet
+from R's basic plotting routines:
+```{r}
+spplot(raster, col.regions = rev(terrain.colors(256)))
+```
+Now the colors are better (but not honest) but the image does still not look good.
+We come back to contrast stretching in the next session.
+
+For vector data, the `spplot` function can be used, too:
+```{r}
+spplot(vector)
+```
+The standard settings will produce one plot for each attribute of the dataset.
+In addition, an identical value range is visualized over all attributes. To change
+that, the zcol argument of the function can be used to select the respective
+attribute:
+```{r}
+spplot(vector, zcol = "NAT")
+```
+For a continoues range of values, use the colorkey argument:
+```{r}
+spplot(vector, zcol = "NAT", colorkey = TRUE)
+```
+
+In order to overlay a vector on a raster map, both have to have the same projection.
+Since our vector data is still in a geographical coordinate system, it has to be
+transformed:
+```{r}
+vector_utm <- spTransform(vector, CRS(projection(raster)))
+```
+Afterwards
+```{r}
+plot(raster) 
+plot(vector_utm, add = TRUE)
+```
+
+```{r}
+spplot(raster, col.regions = rev(terrain.colors(256))) + 
+  as.layer(spplot(vector_utm, zcol = "NAT", colorkey = TRUE))
+```

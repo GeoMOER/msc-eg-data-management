@@ -1,0 +1,322 @@
+---
+output: html_document
+---
+
+
+The following examples show some publication quality, map-type visualizations. 
+The same vector and raster datasets as in the I/O example are taken. The vector
+is already projected to the cartographic reference system of the raster layer.
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results="hide"}
+library(raster)
+library(sp)
+library(rgdal)
+library(grid)
+library(latticeExtra)
+library(RColorBrewer)
+library(rworldmap)
+library(rworldxtra)
+
+setwd("D:/active/moc/dm/examples/data_procd/spatial_data/")
+raster <- raster("LC82100502014328LGN00_B3.tif")
+vector <- readOGR("data_2014_subset1.shp", layer = "data_2014_subset1")
+vector_utm <- spTransform(vector, CRS(projection(raster)))
+```
+
+#####  Visualization of single raster layers
+As alrady introduced in the basic visualization examples from last session, the
+`spplot` function which is based on lattice/trellice can be your workhorse in 
+producing publication quality maps. Let's start with a simple greyscale
+visualization. Please note that this call of spplot actually uses the `levelplot` 
+function to draw the raster layer (which will become important later):
+
+```{r}
+colorsheme <- gray.colors(256)
+spplot(raster, col.regions = colorsheme)
+```
+
+The clouds are obvious, but contrast stretch is far from optimal. Using a histogram
+stretch gives the following results:
+
+```{r}
+breaks <- quantile(raster, seq(0.0, 1.0, length.out = 256))
+colorkey_scale <- 1/breaks
+
+colorkey_lable_pos <- pretty(colorkey_scale, n = 4)
+colorkey_lables <- round(rev((1/pretty(colorkey_scale, n = 4))[2:5]),0)
+
+spplot(raster, col.regions = colorsheme, at = breaks, 
+       colorkey = list(at = as.numeric(colorkey_scale), 
+                       labels = list(lables = colorkey_lables, 
+                                     at  = colorkey_lable_pos)))
+```
+
+Better but rather to light. Before we go on, let's have a quick look on the code.
+Variable breaks is used to store the values of 256 quantiles which are equaly 
+distributed between 0 and 1. This basically leads to a histogram stretch of the
+data values since the value differences between the quantiles are smaller for 
+ranges with frequent values. 
+
+Since we want an undistored color scale, the breaks
+are inverted (variable colorkey_scale) and used to define positions of ticks and
+labels of the color key. The `pretty` function is used for the tick locations 
+since it divides a given value range in about the desired number n of sequences.
+
+The lables for the ticks are finally computed by inverting the colorkey_scale values
+back to the original data values. Since the largest original value had become the
+smallest inverted value, the sequence is reversed by the `rev` function. To
+get rid of needlees value fractions, the labels are rounded to full integer values.
+
+Finally, the raster layer is passed to the `spplot` function along with the 
+location of the breacks and the information for the colorkey.
+
+An alternative contrast stretch method would be e.g. a standard deviation based
+approach. Therefore, one could use the mean value of the data +/- one (or more)
+standard deviations. The following code should be self explaining after the
+above example. Since it is a linear stretch, the labeling transformation/scaling
+is not necessary which makes it a lot easier:
+
+```{r}
+min <- max(mean(getValues(raster)) - sd(getValues(raster)), 0)
+max <- mean(getValues(raster)) + sd(getValues(raster))
+
+breaks <- seq(min, max, length.out = 256)
+
+spplot(raster, col.regions = gray.colors(256), at = breaks)
+```
+
+If you think that a map-type figure should have a cartographic grid, there you go:
+
+```{r}
+yat = seq(extent(raster)@ymin, 
+                extent(raster)@ymax, length.out = 5)
+xat = seq(extent(raster)@xmin, 
+                extent(raster)@xmax, length.out = 5)
+
+spplot(raster, col.regions = gray.colors(256), at = breaks,
+       panel = function(...){
+         panel.levelplot(...)
+         panel.abline(h = yat, v = xat, col = "grey0", lwd = 0.8, lty = 3) 
+         },
+       scales = list(x = list(at = xat),
+                     y = list(at = yat)))
+```
+
+The grid is just a set of vertical/horizontal lines which positions have been
+defined based on the x and y (i.e. easting and northing) extends of the spatial
+data layer. In the example above, 5 equally spaced lines in x and y direction
+are defined by using the `seq` function with the minimum x/y value as starting 
+and the maximum x/y value as end of the value range. The length.out attribute
+defines the number of values in the returned sequence.
+
+Since we have to plot two elements now, the `spplot` function is extended by the
+panel argument. The `panel.levelplot` function draws the levelplot, i.e. the 
+raster layer since `levelplot` is the actual plotting routine of `spplot` if a
+raster layer is passed to the function.
+
+The grid on the other hand is just a set of simple lines which can be drawen by
+e.g. the `abline` function. The `panel.abline` function is just the panel
+equivalent to it. Paramters h and v define the locations of horizontal and 
+vertical lines and the rest of the function is self explaining.
+
+The scales finally takes care of the labeling of the grid lines. Withouth it, the
+lines would just appear without the northing/easting values.
+
+Just for the sake of completness and to make the preparation for the `spplot` 
+function it even more confusing, the following example shows a visualization of
+a geographic projection. Therefore, the raster dataset is projected to a geographic
+coordinate system (variable rasterlatlon):
+
+```{r}
+rasterlatlon <- projectRaster(
+  raster, crs = CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
+
+yat = round(seq(extent(rasterlatlon)@ymin, 
+                extent(rasterlatlon)@ymax, length.out = 5), 2)
+ylabs = ifelse(yat < 0, paste(yat, "°S", sep = ""),
+               ifelse(yat > 0, paste(yat, "°N", sep = ""),
+                      paste(yat, "°", sep = "")))
+
+xat = round(seq(extent(rasterlatlon)@xmin, 
+                extent(rasterlatlon)@xmax, length.out = 5), 2)
+xlabs = ifelse(xat < 0, paste(xat, "°W", sep = ""),
+               ifelse(xat > 0, paste(xat, "°E", sep = ""),
+                      paste(xat, "°", sep = "")))
+
+spplot(rasterlatlon, col.regions = gray.colors(256), at = breaks,
+       panel = function(...){
+         #          grid.rect(gp=gpar(col=NA, fill="grey50"))
+         panel.levelplot(...)
+         panel.abline(h = yat, v = xat, col = "grey0", lwd = 0.8, lty = 3) 
+         },
+       scales = list(x = list(at = xat, labels = xlabs),
+                     y = list(at = yat, labels = ylabs)))
+```
+
+Basically, the code above shows nothing new for the `spplot` function but the 
+grid is now additionally labled with the characters N and W. This is possible since
+the lables are explicitly provided to the scales attribute of the function.
+
+As a last example for a single raster layer, we will add country boundaries on 
+top of the raster image. Therefore, the `getMaps` function of the rworldmap 
+package is used. Since it returns the data in geographical coordinates, we use
+the extend of the projected raster layer from above to crop the world wide
+country boundaries to the desired region and project the data to the UTM projection
+of the raster layer afterwards by using the `spTransform` function.
+
+```{r}
+ext <- extent(rasterlatlon)
+map <- getMap(resolution = "high")
+map <- crop(map, ext)
+map <- spTransform(map, CRS(projection(raster)))
+
+ext <- extent(raster)
+spplot(raster, col.regions = gray.colors(256), at = breaks,
+       xlim=c(ext@xmin, ext@xmax), ylim=c(ext@ymin, ext@ymax),
+       panel = function(...){
+         panel.levelplot(...)
+         panel.abline(h = yat, v = xat, col = "grey0", lwd = 0.8, lty = 3) 
+         sp.polygons(map, lwd = 0.5)
+         },
+       scales = list(x = list(at = xat),
+                     y = list(at = yat)))
+```
+
+As you might notice, the country vector does not match the island. This is an 
+error in the data set but just look at it as a how to recipe.
+
+#####  Visualization of raster and vector layers
+Visualizing the location of e.g. points of a vector layer is easy and straight
+forward. Again, the panel attribute is used but instead of using a panel for 
+lines, the vector points are visualized by using the `sp.points` panel function:
+
+```{r}
+spplot(raster, col.regions = gray.colors(256), at = breaks,
+       panel = function(...){
+         panel.levelplot(...)
+         sp.points(vector_utm) 
+         },
+       scales = list(x = list(at = xat),
+                     y = list(at = yat)))
+```
+
+So much for the easy part. The call of the `spplot` function becomes more 
+complicated, if one wants to visualize a specific attribute of the vector along
+with an appropriate legend. In the following example, the vegetation coverage
+should be visualized:
+
+```{r}
+vector_classes <- cut(vector_utm@data$COVRG, c(0, 20, 40, 60, 80, 100, 120))
+vector_colors <- colorRampPalette(brewer.pal(6,"Greens"))(6)
+
+plt <- spplot(raster, col.regions = gray.colors(256), at = breaks,
+       key = list(space = 'left', text = list(levels(vector_classes)), 
+                     points = list(pch = 21, cex = 2, fill = vector_colors)),
+       colorkey=list(space="right"),
+       panel = function(...){
+         panel.levelplot(...)
+         panel.abline(h = yat, v = xat, col = "grey0", lwd = 0.8, lty = 3) 
+         },
+       scales = list(x = list(at = xat),
+                     y = list(at = yat)))
+
+orl <- spplot(vector_utm, zcol = "COVRG", col.regions = vector_colors, 
+              cuts = c(0, 20, 40, 60, 80, 100, 120))
+
+plt + as.layer(orl)
+```
+
+Let's have a look at the code above. The first `spplot` call looks like the ones
+above except for two aspects. First, the colorkey argument is used to specify the
+location of the default color legend bar. Since it is set to the right hand side
+of the plot which is the default, it is actually not necessary, but for 
+documentation purposes we include it anyway. 
+
+The second and important difference is the key argument. It defines the legend for
+the vegetation coverage attribute of the vector dataset. The legend is set to the
+left hand side of the plot (argument space) and the labels are based on the 
+pre-defined classes into which the attribute information has been divided by the
+`cut` function in the first line of the code example. The points argument 
+finally defines the size and type of the points along with the colors.
+
+As a result, a map-type visualization of the raster layer along with both the
+legend for the raster values and the vector values will be stored in the variable
+plt.
+
+The vector layer attribute is visualized by a seperate call to the `spplot` function. 
+
+The last line combines both plots in order to visualize the final map.
+
+For those who really would like to have a continous color scale bar for the
+vector data set, the following code is of interest. But if you feel dizzy 
+already from the example above, do not have a look at it now.
+
+```{r}
+colorsheme <- colorRampPalette(brewer.pal(9,"Greens"))(256)
+
+vector_classes <- cut(vector_utm@data$COVRG, seq(0, 120, length.out = 256))
+
+plt <- spplot(raster, col.regions = gray.colors(256), at = breaks,
+       colorkey=list(space="right"),
+       panel = function(...){
+         panel.levelplot(...)
+         panel.abline(h = yat, v = xat, col = "grey0", lwd = 0.8, lty = 3) 
+         },
+       scales = list(x = list(at = xat),
+                     y = list(at = yat)))
+
+orl <- spplot(vector_utm, zcol = "COVRG", col.regions = colorsheme, cuts = 256,
+              colorkey = TRUE)
+
+comb <- plt + as.layer(orl)
+print(comb)
+
+downViewport(trellis.vpname(name = "figure")) 
+vp1 <- viewport(x = -0.2, y = 1,
+                height = 1, width = 1,
+                just = c("centre", "top"),
+                name = "key.vp") 
+pushViewport(vp1) 
+draw.colorkey(key = list(col = colorsheme, width = 2,
+                          at = seq(0, 110, length.out = 256),
+                          space = "left"), draw = TRUE)
+```
+
+Basically, the raster and vector layer is plotted independently from each other
+and this time, the legend of the vector layer is not included in the call
+of the `spplot` function for the raster layer.
+
+Although it might look like that, but the colorkey argument used within the 
+`spplot` call for the vector layer does not matter, too. In fact, we could have
+set it to TRUE in the previous example, too, but it would not have made any 
+difference. We just set it to TRUE because in that case, a continoues
+color scheme is drawn for the plot which is faster than a color legend with 256
+individual circles and values (which would be the result from colorkey = FALSE
+which is the default).
+
+The legend for the vector layer is actually drawn after the combined plot has
+been printed (i.e. `print(comb)`). Therefore, the vieport (i.e. the region 
+which has just been used to draw the figure) is identified and then a new
+vieport is added to the existing one at a specific position. In this case,
+the position is just left of the main plotting area which is used for the 
+visualizatino of the raster and vector layer and which ends at x coordinate 0.
+
+This viewport is finally set as the active one by using the `pusViewport` 
+function and the `draw.colorkey` function is used to draw the legend of the
+vector attribute at exactly this viewport's location. If you want to know 
+more about that kind of stuff, have a look at the `grid` package and the 
+respective documentation.
+
+
+#####  RGB color plot
+```{r}
+setwd("D:/active/moc/dm/examples/data_procd/spatial_data/")
+raster_stack <- stack("LC82100502014328LGN00_B3.tif", 
+                      "LC82100502014328LGN00_B2.tif", 
+                      "LC82100502014328LGN00_B1.tif")
+
+raster_stack[[1]] <- stretch(raster_stack[[1]], minv = 0, maxv = 255, minq = 0.01, maxq = 0.80)
+raster_stack[[2]] <- stretch(raster_stack[[2]], minv = 0, maxv = 255, minq = 0.01, maxq = 0.72)
+raster_stack[[3]] <- stretch(raster_stack[[3]], minv = 0, maxv = 255, minq = 0.01, maxq = 0.75)
+
+plotRGB(raster_stack, stretch = "lin")
+```
