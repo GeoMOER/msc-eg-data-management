@@ -18,6 +18,10 @@ library(rworldxtra)
 
 setwd("D:/active/moc/dm/examples/data_procd/spatial_data/")
 raster <- raster("LC82100502014328LGN00_B3.tif")
+raster_latlon <- raster("LC82100502014328LGN00_B3_latlon.tif")
+raster_stack <- stack("LC82100502014328LGN00_B1.tif", 
+                      "LC82100502014328LGN00_B2.tif", 
+                      "LC82100502014328LGN00_B3.tif")
 vector <- readOGR("data_2014_subset1.shp", layer = "data_2014_subset1")
 vector_utm <- spTransform(vector, CRS(projection(raster)))
 ```
@@ -124,32 +128,29 @@ lines would just appear without the northing/easting values.
 Just for the sake of completness and to make the preparation for the `spplot` 
 function it even more confusing, the following example shows a visualization of
 a geographic projection. Therefore, the raster dataset is projected to a geographic
-coordinate system (variable rasterlatlon):
+coordinate system (variable raster_latlon):
 
 ```{r}
-rasterlatlon <- projectRaster(
-  raster, crs = CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
+yat_latlon = round(seq(extent(raster_latlon)@ymin, 
+                extent(raster_latlon)@ymax, length.out = 5), 2)
+ylabs_latlon = ifelse(yat_latlon < 0, paste(yat_latlon, "°S", sep = ""),
+               ifelse(yat_latlon > 0, paste(yat_latlon, "°N", sep = ""),
+                      paste(yat_latlon, "°", sep = "")))
 
-yat = round(seq(extent(rasterlatlon)@ymin, 
-                extent(rasterlatlon)@ymax, length.out = 5), 2)
-ylabs = ifelse(yat < 0, paste(yat, "°S", sep = ""),
-               ifelse(yat > 0, paste(yat, "°N", sep = ""),
-                      paste(yat, "°", sep = "")))
+xat_latlon = round(seq(extent(raster_latlon)@xmin, 
+                extent(raster_latlon)@xmax, length.out = 5), 2)
+xlabs_latlon = ifelse(xat_latlon < 0, paste(xat_latlon, "°W", sep = ""),
+               ifelse(xat_latlon > 0, paste(xat_latlon, "°E", sep = ""),
+                      paste(xat_latlon, "°", sep = "")))
 
-xat = round(seq(extent(rasterlatlon)@xmin, 
-                extent(rasterlatlon)@xmax, length.out = 5), 2)
-xlabs = ifelse(xat < 0, paste(xat, "°W", sep = ""),
-               ifelse(xat > 0, paste(xat, "°E", sep = ""),
-                      paste(xat, "°", sep = "")))
-
-spplot(rasterlatlon, col.regions = gray.colors(256), at = breaks,
+spplot(raster_latlon, col.regions = gray.colors(256), at = breaks,
        panel = function(...){
          #          grid.rect(gp=gpar(col=NA, fill="grey50"))
          panel.levelplot(...)
-         panel.abline(h = yat, v = xat, col = "grey0", lwd = 0.8, lty = 3) 
+         panel.abline(h = yat_latlon, v = xat_latlon, col = "grey0", lwd = 0.8, lty = 3) 
          },
-       scales = list(x = list(at = xat, labels = xlabs),
-                     y = list(at = yat, labels = ylabs)))
+       scales = list(x = list(at = xat_latlon, labels = xlabs_latlon),
+                     y = list(at = yat_latlon, labels = ylabs_latlon)))
 ```
 
 Basically, the code above shows nothing new for the `spplot` function but the 
@@ -164,7 +165,7 @@ country boundaries to the desired region and project the data to the UTM project
 of the raster layer afterwards by using the `spTransform` function.
 
 ```{r}
-ext <- extent(rasterlatlon)
+ext <- extent(raster_latlon)
 map <- getMap(resolution = "high")
 map <- crop(map, ext)
 map <- spTransform(map, CRS(projection(raster)))
@@ -271,7 +272,7 @@ comb <- plt + as.layer(orl)
 print(comb)
 
 downViewport(trellis.vpname(name = "figure")) 
-vp1 <- viewport(x = -0.2, y = 1,
+vp1 <- viewport(x = -0.25, y = 1,
                 height = 1, width = 1,
                 just = c("centre", "top"),
                 name = "key.vp") 
@@ -308,15 +309,27 @@ respective documentation.
 
 
 #####  RGB color plot
+As a last example, this is how you can produce a RGB image from a raster stack.
+The raster stack contains bands 1 through 3 of a Landsat scene:
 ```{r}
-setwd("D:/active/moc/dm/examples/data_procd/spatial_data/")
-raster_stack <- stack("LC82100502014328LGN00_B3.tif", 
-                      "LC82100502014328LGN00_B2.tif", 
-                      "LC82100502014328LGN00_B1.tif")
+names(raster_stack)
+```
 
-raster_stack[[1]] <- stretch(raster_stack[[1]], minv = 0, maxv = 255, minq = 0.01, maxq = 0.80)
-raster_stack[[2]] <- stretch(raster_stack[[2]], minv = 0, maxv = 255, minq = 0.01, maxq = 0.72)
-raster_stack[[3]] <- stretch(raster_stack[[3]], minv = 0, maxv = 255, minq = 0.01, maxq = 0.75)
+Since contrast stretch is also important for color composits, the bands are 
+stretched using some interactively defined bounds for the linear stretch:
+```{r}
+raster_stack[[1]] <- 
+  stretch(raster_stack[[1]], minv = 0, maxv = 255, minq = 0.01, maxq = 0.75)
+raster_stack[[2]] <- 
+  stretch(raster_stack[[2]], minv = 0, maxv = 255, minq = 0.01, maxq = 0.72)
+raster_stack[[3]] <- 
+  stretch(raster_stack[[3]], minv = 0, maxv = 255, minq = 0.01, maxq = 0.80)
+```
 
-plotRGB(raster_stack, stretch = "lin")
+Once this is done, the composit can be plotted using the `plotRGB` function.
+Since the raster stack contains the bands in blue, green, red order, the 
+appropriate stack layer for the individual colors (i.e. r, g, b) has to be 
+provided to the function:
+```{r}
+plotRGB(raster_stack, r = 3, g = 2, b = 1, stretch = "lin")
 ```

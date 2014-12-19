@@ -1,0 +1,33 @@
+---
+output: html_document
+---
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results="hide"}
+wb <- read.table(
+  "D:/active/moc/dm/examples/data_procd/wb-db_gnipc_co2_1960-2013.csv", 
+  header = TRUE, sep = ",")
+cntry <- read.table(
+  "D:/active/moc/dm/examples/data_raw/wb-db_country_classes.csv", 
+  header = TRUE, sep = ",")
+wbc <- merge(wb, cntry[,!(grepl("Economy|X", colnames(cntry)))], 
+             by.x = "Country.Code", by.y = "Code")
+wbc$Region[wbc$Region == ".."] <- NA
+wbc$Region <- droplevels(wbc$Region)
+wbc$co2_log <- log(wbc$co2)
+wbc$gni_log <- log(wbc$gni)
+wbc <- wbc[!(is.na(wbc$Region)),]
+library(iplots)
+```
+
+
+
+```{r}
+ihist(wbc$gni_log)
+ihist(wbc$co2_log)
+ibox(wbc$gni_log, wbc$Region)
+ibox(wbc$co2_log, wbc$Region)
+iplot(wbc$gni_log, wbc$co2_log)
+
+
+```
