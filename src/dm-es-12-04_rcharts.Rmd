@@ -1,0 +1,85 @@
+---
+output: html_document
+runtime: shiny
+---
+
+The following examples introduce the `shiny` libary, which can be used for 
+interactive web-type applications either as stand alone server app, or as a kind
+of Rmarkdown web site or slide presentation. The main difference between Rmarkdown
+and shiny is that shiny requires either an active R/RStudio session if it is
+running local or a shiny server if it is running online.
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results="hide"}
+if(Sys.info()["user"] == "shiny"){
+  in_path1 <- "/srv/shiny-server/moc/msc-data-management/data_procd/"
+  in_path2 <- "/srv/shiny-server/moc/msc-data-management/data_raw/"
+  in_path3 <- "/srv/shiny-server/moc/msc-data-management/data_procd/spatial_data/"
+  } else {
+    setwd("D:/active/moc/dm/examples/")
+    in_path1 <- paste0(getwd(), "/data_procd/")
+    in_path2 <- paste0(getwd(), "/data_raw/")
+    in_path3 <- paste0(getwd(), "/data_procd/spatial_data/")
+    }
+
+packages <- c("rCharts", "reshape2", "raster", "rgdal", 
+              "latticeExtra", "caret", "gridExtra")
+lapply(packages, library, character.only = TRUE)
+
+wb <- read.table(paste0(in_path1, "wb-db_gnipc_co2_1960-2013.csv"), 
+                 header = TRUE, sep = ",")
+cntry <- read.table(paste0(in_path2, "wb-db_country_classes.csv"), 
+                    header = TRUE, sep = ",")
+wbc <- merge(wb, cntry[,!(grepl("Economy|X", colnames(cntry)))], 
+             by.x = "Country.Code", by.y = "Code")
+wbc$Region[wbc$Region == ".."] <- NA
+wbc$Region <- droplevels(wbc$Region)
+wbc$co2_log <- log(wbc$co2)
+wbc$gni_log <- log(wbc$gni)
+wbc <- wbc[complete.cases(wbc),]
+load(paste0(in_path3, "dm-es-12_02_rf.RData"))
+ndvi_original <- raster$ndvi_fogo_landsat
+prediction_original <- predict(raster, model.train[[1]])
+clrs.ndvi <- colorRampPalette(brewer.pal(8,"YlGn"))(256)
+clrs.change <- colorRampPalette(brewer.pal(11,"Spectral"))(256)
+```
+
+This R Markdown document is made interactive using Shiny. Unlike the more traditional workflow of creating static reports, you can now create documents that allow your readers to change the assumptions underlying your analysis and see the results immediately. 
+
+To learn more, see [Interactive Documents](http://rmarkdown.rstudio.com/authoring_shiny.html).
+
+##### Histogram
+
+You can embed Shiny inputs and outputs in your document. Outputs are automatically updated whenever inputs change.  This demonstrates how a standard R plot can be made interactive by wrapping it in the Shiny `renderPlot` function. The `selectInput` and `sliderInput` functions create the input widgets used to drive the plot.
+
+```{r, echo=FALSE, }
+slider <- input_slider(10, 100)
+mtcars %>% ggvis(~wt, ~mpg) %>%
+  layer_points(size := slider) %>% 
+  layer_points(fill := "red", opacity := 0.5, size := slider)
+
+mtcars %>% ggvis(~wt, ~mpg) %>%
+  layer_points(size := input_slider(100, 1000, label = "black")) %>%
+  layer_points(fill := "red", size := input_slider(100, 1000, label = "red"))
+
+
+p1 <- ggvis(~wt, ~mpg, data = mtcars)
+p1
+layer_points(p1, size := input_slider(100, 1000, label = "black"))
+layer_points(p1, fill := "red", size := input_slider(100, 1000, label = "red"))
+
+inputPanel(
+  
+  selectInput("n_breaks", label = "Number of bins:",
+              choices = c(10, 20, 35, 50), selected = 20),
+  
+  sliderInput("bw_adjust", label = "Bandwidth adjustment:",
+              min = 0.2, max = 2, value = 1, step = 0.2,
+              animate = animationOptions(interval = 1000, loop = TRUE, 
+                                         playButton = NULL, pauseButton = NULL))
+  )
+
+renderPlot({
+  names(iris) = gsub("\\.", "", names(iris))
+  rPlot(SepalLength ~ SepalWidth | Species, data = iris, 
+        color = 'Species', type = 'point')
+  })
+```

@@ -1,0 +1,216 @@
+---
+title: "Example of a shiny HTML document"
+author: "Thomas Nauss"
+date: "Saturday, December 20, 2014"
+output: html_document
+runtime: shiny
+---
+
+The following examples show some interactive visualizations using the `shiny`
+library in the markdown version. The already known CO2 and GNI data from the
+World Bank Group as well as the vector and raster datasets used in the map-type
+figure example are taken.
+
+The content of this document is similar to an R Markdown document but in contrast
+to R Markdown, shiny requires either an active R session or a shiny server to 
+be served online.
+
+Basically, all you have to do is to come up with standard R code. The part of the
+code which should be adapted by some interaction has to be included inside the
+`renderPlot` function. To change that code, include one or more input selectors
+inside the `inputPanel` function. The actual value of the variables changed
+by the input selectors can be accessed by calling the column of a data frame 
+called "input" which has the same name as the keyword used for the input selector.
+
+For more information, have a look at the [shiny documentation](http://rmarkdown.rstudio.com/authoring_shiny.html).
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results="hide"}
+if(Sys.info()["user"] == "shiny"){
+  in_path1 <- "/srv/shiny-server/moc/msc-data-management/data_procd/"
+  in_path2 <- "/srv/shiny-server/moc/msc-data-management/data_raw/"
+  in_path3 <- "/srv/shiny-server/moc/msc-data-management/data_procd/spatial_data/"
+  } else {
+    setwd("D:/active/moc/dm/examples/")
+    in_path1 <- paste0(getwd(), "/data_procd/")
+    in_path2 <- paste0(getwd(), "/data_raw/")
+    in_path3 <- paste0(getwd(), "/data_procd/spatial_data/")
+    }
+
+packages <- c("raster", "rgdal", "latticeExtra", "caret", "gridExtra")
+lapply(packages, library, character.only = TRUE)
+
+wb <- read.table(paste0(in_path1, "wb-db_gnipc_co2_1960-2013.csv"), 
+                 header = TRUE, sep = ",")
+cntry <- read.table(paste0(in_path2, "wb-db_country_classes.csv"), 
+                    header = TRUE, sep = ",")
+wbc <- merge(wb, cntry[,!(grepl("Economy|X", colnames(cntry)))], 
+             by.x = "Country.Code", by.y = "Code")
+wbc$Region[wbc$Region == ".."] <- NA
+wbc$Region <- droplevels(wbc$Region)
+wbc$co2_log <- log(wbc$co2)
+wbc$gni_log <- log(wbc$gni)
+wbc <- wbc[complete.cases(wbc),]
+```
+
+##### Histogram
+The first example shows two histogram plots which are plotted next to each other
+by using `grid` function from the `gridExtra` library.
+
+The `inputPanel` function contains two input selectors: a drop down menue
+defined by the `selectInput` function and a slider defined by the `sliderInput`
+function. Each of those input selectors is identified by a keyword (inputId) and
+the actual value of the selector can be accessed by a data frame called "input".
+This data frame is constructed by shiny in the background and can not be seen
+in the code. For example, to access the content of the drop down menue, just
+use "input$n_breaks".
+
+The `renderPlot` function contains the two plots (one for GNI, one for CO2).
+Please note that this is standard R code (i.e. lattice plot code) so there is
+nothing new. First, the histogram of the GNI values is stored in a variable
+called "hist1". Second, the density line is stored in a variable "dens1" and 
+afterwards both are combined into one plot stored "plot1". The same is done
+for CO2 afterwards and finally both plots are visualized by the 
+`grid.arrange` function.
+
+The only thing which is not standard inside the `renderPlot` function is the 
+usage of the "input" data frame since it has not been defined in the code but
+which is defined by shiny as a result from the `inputPanel` function. That's all.
+
+```{r}
+inputPanel(
+  
+  selectInput(inputId = "n_breaks", label = "Number of bins:",
+              choices = c(10, 20, 35, 50), selected = 20),
+  
+  sliderInput(inputId = "bw_adjust", label = "Bandwidth adjustment:",
+              min = 0.2, max = 2, value = 1, step = 0.2,
+              animate = animationOptions(interval = 1000, loop = TRUE, 
+                                         playButton = NULL, pauseButton = NULL))
+  )
+
+renderPlot({
+  hist1 <- histogram(wbc$gni_log, type = "density", 
+            breaks = as.numeric(input$n_breaks), col = "white",
+       xlab = "Logarithm of GNI", ylab = "Density", 
+       main = "World bank data GNI values")
+
+  dens1 <- densityplot(wbc$gni_log, adjust = input$bw_adjust, na.rm = TRUE, 
+              col = "darkgreen", lwd = 3.0, plot.points = FALSE)
+  
+  plot1 <- hist1 + as.layer(dens1)
+
+  hist2 <- histogram(wbc$co2_log, type = "density", 
+            breaks = as.numeric(input$n_breaks), col = "white",
+       xlab = "Logarithm of CO2", ylab = "Density", 
+       main = "World bank data CO2 values")
+
+  dens2 <- densityplot(wbc$co2_log, adjust = input$bw_adjust, na.rm = TRUE, 
+              col = "blue", lwd = 3.0, plot.points = FALSE)
+  
+  plot2 <- hist2 + as.layer(dens2)
+  
+  grid.arrange(plot1, plot2, ncol = 2)
+  })
+```
+
+
+##### XYPlot
+
+The next example shows the correlation between the CO2 and GNI as a scatter
+plot. This time, the interactive component allows the selection of
+different models which fit the data set.
+
+Compared to the example above, only one input selector (drop down menue) is
+used. As you can see, the basic structure stays the same and only the behaviour
+(i.e. content) of the input selector (function `inputPanel`) and the code inside the `renderPlot` function is changed. The latter is standard R code which has nothing to do with shiny but just encompasses a couple of else if statements to
+run the model which has been chosen by the use in the drop down menu as well as
+the respective lattice plot routine for scatter plots (i.e. xyplot).
+
+```{r}
+inputPanel(
+  
+  selectInput(inputId = "model_select", label = "Select model:",
+              choices = c("Linear model", "Exponential model",
+                          "Self starting logistic model", "Tolerance curve"),
+              selected = "Linear model")
+  )
+
+renderPlot({
+
+  if(input$model_select == "Linear model"){
+    # linear model
+    l_model <- lm(wbc$co2_log ~ wbc$gni_log)
+    thv <- predict.lm(l_model, wbc)
+    } 
+  else if(input$model_select == "Exponential model"){
+    f <- function(y0, x, a, b) {y0 + a * exp(b * x)}
+    exp_model <- nls(co2_log ~ f(y0, gni_log, a, b),
+                     data = wbc,
+                     start = list(y0 = 3, a = 0.5, b = 0.5)) 
+    thv <- predict(exp_model, wbc$gni_log)
+    } 
+  else if(input$model_select == "Self starting logistic model"){
+    Asym <- 1; xmid <- 1; scal <- 1
+    getInitial(co2_log ~ SSlogis(gni_log, Asym, xmid, scal), data = wbc)
+    ssl_model <- nls(co2_log ~ SSlogis(gni_log, Asym, xmid, scal), data = wbc)
+    thv <- predict(ssl_model, wbc$gni_log)
+    } 
+  else if(input$model_select == "Tolerance curve"){
+    tc_model= nls(co2_log ~ 1 + a * (gni_log^2) + b * gni_log + c, wbc,
+                  start = list(a=1, b=1, c=1))
+    thv <- predict(tc_model, wbc$gni_log)
+    }
+  
+  xyplot(wbc$co2_log[wbc$co2_log >  thv] ~ 
+           wbc$gni_log[wbc$co2_log >  thv],
+         col = "red", ylim = range(wbc$co2_log, na.rm = TRUE),
+         xlab = "Logarithm of GNI", ylab = "Logarithm of CO2", 
+         main = "World bank data values") +
+    as.layer(xyplot(wbc$co2_log[wbc$co2_log <=  thv] ~ 
+                      wbc$gni_log[wbc$co2_log <=  thv], 
+                    col = "blue")) + 
+    as.layer(xyplot(thv ~ wbc$gni_log, type = "spline", 
+                    col = "green", lwd = 5))
+  })
+```
+
+
+
+##### Random forest
+This final example uses a pre-computed random forest model which is loaded into
+R using the `load` function. The only difference to standard R code is again the
+drop down menue defined in the `inputPanel` function and the wrapping of those
+parts of the code which actually consider the user input inside the `renderPlot`
+function. 
+
+```{r}
+load(paste0(in_path3, "dm-es-12_02_rf.RData"))
+ndvi_original <- raster$ndvi_fogo_landsat
+prediction_original <- predict(raster, model.train[[1]])
+clrs.ndvi <- colorRampPalette(brewer.pal(8,"YlGn"))(256)
+clrs.change <- colorRampPalette(brewer.pal(11,"Spectral"))(256)
+
+inputPanel(
+  selectInput(inputId = "ndvi", label = "Change percentage NDVI:",
+              choices = seq(0, 200, 10), selected = 100)
+  )
+
+renderPlot({
+  raster$ndvi_fogo_landsat <- ndvi_original * (as.numeric(input$ndvi) / 100)
+  prediction_raster <- predict(raster, model.train[[1]])
+
+  
+  plot1 <- spplot(prediction_raster,col.regions = clrs.ndvi,
+                  colorkey = list(at = seq(0, 11, length.out = 256)),
+         main = "Predicted species richness \n based on Landsat 8 data",
+         sub = paste0("Result is based on ",input$ndvi, "% of 2014 NDVI values"),
+         scales = list(draw = TRUE))
+  change_raster = (1-prediction_raster / prediction_original) * 100
+  plot2 <- spplot(change_raster,col.regions = clrs.change, 
+                  colorkey = list(at = seq(-100, 100, length.out = 256)),
+                  main = "Percentage change in prediction \n results compared to 100% NDVI",
+                  scales = list(draw = TRUE))
+  grid.arrange(plot1, plot2, ncol = 2)
+  })
+```
+

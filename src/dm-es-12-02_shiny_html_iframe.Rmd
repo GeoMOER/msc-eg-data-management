@@ -3,6 +3,24 @@ output: html_document
 runtime: shiny
 ---
 
+The following examples show some interactive visualizations using the `shiny`
+library in the markdown version. The already known CO2 and GNI data from the
+World Bank Group as well as the vector and raster datasets used in the map-type
+figure example are taken.
+
+The content of this document is similar to an R Markdown document but in contrast
+to R Markdown, shiny requires either an active R session or a shiny server to 
+be served online.
+
+Basically, all you have to do is to come up with standard R code. The part of the
+code which should be adapted by some interaction has to be included inside the
+`renderPlot` function. To change that code, include one or more input selectors
+inside the `inputPanel` function. The actual value of the variables changed
+by the input selectors can be accessed by calling the column of a data frame 
+called "input" which has the same name as the keyword used for the input selector.
+
+For more information, have a look at the [shiny documentation](http://rmarkdown.rstudio.com/authoring_shiny.html).
+
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="hide"}
 if(Sys.info()["user"] == "shiny"){
   in_path1 <- "/srv/shiny-server/moc/msc-data-management/data_procd/"
@@ -29,28 +47,39 @@ wbc$Region <- droplevels(wbc$Region)
 wbc$co2_log <- log(wbc$co2)
 wbc$gni_log <- log(wbc$gni)
 wbc <- wbc[complete.cases(wbc),]
-load(paste0(in_path3, "dm-es-12_02_rf.RData"))
-ndvi_original <- raster$ndvi_fogo_landsat
-prediction_original <- predict(raster, model.train[[1]])
-clrs.ndvi <- colorRampPalette(brewer.pal(8,"YlGn"))(256)
-clrs.change <- colorRampPalette(brewer.pal(11,"Spectral"))(256)
 ```
 
-This R Markdown document is made interactive using Shiny. Unlike the more traditional workflow of creating static reports, you can now create documents that allow your readers to change the assumptions underlying your analysis and see the results immediately. 
-
-To learn more, see [Interactive Documents](http://rmarkdown.rstudio.com/authoring_shiny.html).
-
 ##### Histogram
+The first example shows two histogram plots which are plotted next to each other
+by using `grid` function from the `gridExtra` library.
 
-You can embed Shiny inputs and outputs in your document. Outputs are automatically updated whenever inputs change.  This demonstrates how a standard R plot can be made interactive by wrapping it in the Shiny `renderPlot` function. The `selectInput` and `sliderInput` functions create the input widgets used to drive the plot.
+The `inputPanel` function contains two input selectors: a drop down menue
+defined by the `selectInput` function and a slider defined by the `sliderInput`
+function. Each of those input selectors is identified by a keyword (inputId) and
+the actual value of the selector can be accessed by a data frame called "input".
+This data frame is constructed by shiny in the background and can not be seen
+in the code. For example, to access the content of the drop down menue, just
+use "input$n_breaks".
 
-```{r, echo=FALSE, }
+The `renderPlot` function contains the two plots (one for GNI, one for CO2).
+Please note that this is standard R code (i.e. lattice plot code) so there is
+nothing new. First, the histogram of the GNI values is stored in a variable
+called "hist1". Second, the density line is stored in a variable "dens1" and 
+afterwards both are combined into one plot stored "plot1". The same is done
+for CO2 afterwards and finally both plots are visualized by the 
+`grid.arrange` function.
+
+The only thing which is not standard inside the `renderPlot` function is the 
+usage of the "input" data frame since it has not been defined in the code but
+which is defined by shiny as a result from the `inputPanel` function. That's all.
+
+```{r}
 inputPanel(
   
-  selectInput("n_breaks", label = "Number of bins:",
+  selectInput(inputId = "n_breaks", label = "Number of bins:",
               choices = c(10, 20, 35, 50), selected = 20),
   
-  sliderInput("bw_adjust", label = "Bandwidth adjustment:",
+  sliderInput(inputId = "bw_adjust", label = "Bandwidth adjustment:",
               min = 0.2, max = 2, value = 1, step = 0.2,
               animate = animationOptions(interval = 1000, loop = TRUE, 
                                          playButton = NULL, pauseButton = NULL))
@@ -83,10 +112,21 @@ renderPlot({
 
 
 ##### XYPlot
-```{r, echo=FALSE, }
+
+The next example shows the correlation between the CO2 and GNI as a scatter
+plot. This time, the interactive component allows the selection of
+different models which fit the data set.
+
+Compared to the example above, only one input selector (drop down menue) is
+used. As you can see, the basic structure stays the same and only the behaviour
+(i.e. content) of the input selector (function `inputPanel`) and the code inside the `renderPlot` function is changed. The latter is standard R code which has nothing to do with shiny but just encompasses a couple of else if statements to
+run the model which has been chosen by the use in the drop down menu as well as
+the respective lattice plot routine for scatter plots (i.e. xyplot).
+
+```{r}
 inputPanel(
   
-  selectInput("model_select", label = "Select model:",
+  selectInput(inputId = "model_select", label = "Select model:",
               choices = c("Linear model", "Exponential model",
                           "Self starting logistic model", "Tolerance curve"),
               selected = "Linear model")
@@ -134,9 +174,21 @@ renderPlot({
 
 
 ##### Random forest
-```{r, echo=FALSE}
+This final example uses a pre-computed random forest model which is loaded into
+R using the `load` function. The only difference to standard R code is again the
+drop down menue defined in the `inputPanel` function and the wrapping of those
+parts of the code which actually consider the user input inside the `renderPlot`
+function. 
+
+```{r}
+load(paste0(in_path3, "dm-es-12_02_rf.RData"))
+ndvi_original <- raster$ndvi_fogo_landsat
+prediction_original <- predict(raster, model.train[[1]])
+clrs.ndvi <- colorRampPalette(brewer.pal(8,"YlGn"))(256)
+clrs.change <- colorRampPalette(brewer.pal(11,"Spectral"))(256)
+
 inputPanel(
-  selectInput("ndvi", label = "Change percentage NDVI:",
+  selectInput(inputId = "ndvi", label = "Change percentage NDVI:",
               choices = seq(0, 200, 10), selected = 100)
   )
 
@@ -158,4 +210,3 @@ renderPlot({
   grid.arrange(plot1, plot2, ncol = 2)
   })
 ```
-

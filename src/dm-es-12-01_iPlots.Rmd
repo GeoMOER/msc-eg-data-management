@@ -2,6 +2,14 @@
 output: html_document
 ---
 
+The following examples show how to produce histogram, box whisker and scatter
+plots using the `iPlots` package. The exemplary data frame contents are based on 
+the already known World Bank data sets. Since they only work from inside an 
+active R environment, no output can be shown here.
+
+Please note that you need the `rJava` package in order to run iPlots. Depending
+on your system configuration it might be a good idea to run a 32bit R version
+(and the corresponding Java version) even if you have a 64bit processor.
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results="hide"}
 wb <- read.table(
@@ -17,12 +25,12 @@ wbc$Region <- droplevels(wbc$Region)
 wbc$co2_log <- log(wbc$co2)
 wbc$gni_log <- log(wbc$gni)
 wbc <- wbc[!(is.na(wbc$Region)),]
-library(iplots)
 ```
 
 
 
-```{r}
+```{r, warning=FALSE, results="hide"}
+library(iplots)
 ihist(wbc$gni_log)
 ihist(wbc$co2_log)
 ibox(wbc$gni_log, wbc$Region)

@@ -1,0 +1,160 @@
+---
+title: "Example of a shiny slide show document"
+author: "Thomas Nauss"
+date: "Saturday, December 20, 2014"
+output: ioslides_presentation
+runtime: shiny
+---
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results="hide"}
+if(Sys.info()["user"] == "shiny"){
+  in_path1 <- "/srv/shiny-server/moc/msc-data-management/data_procd/"
+  in_path2 <- "/srv/shiny-server/moc/msc-data-management/data_raw/"
+  in_path3 <- "/srv/shiny-server/moc/msc-data-management/data_procd/spatial_data/"
+  } else {
+    setwd("D:/active/moc/dm/examples/")
+    in_path1 <- paste0(getwd(), "/data_procd/")
+    in_path2 <- paste0(getwd(), "/data_raw/")
+    in_path3 <- paste0(getwd(), "/data_procd/spatial_data/")
+    }
+
+packages <- c("raster", "rgdal", "latticeExtra", "caret", "gridExtra")
+lapply(packages, library, character.only = TRUE)
+
+wb <- read.table(paste0(in_path1, "wb-db_gnipc_co2_1960-2013.csv"), 
+                 header = TRUE, sep = ",")
+cntry <- read.table(paste0(in_path2, "wb-db_country_classes.csv"), 
+                    header = TRUE, sep = ",")
+wbc <- merge(wb, cntry[,!(grepl("Economy|X", colnames(cntry)))], 
+             by.x = "Country.Code", by.y = "Code")
+wbc$Region[wbc$Region == ".."] <- NA
+wbc$Region <- droplevels(wbc$Region)
+wbc$co2_log <- log(wbc$co2)
+wbc$gni_log <- log(wbc$gni)
+wbc <- wbc[complete.cases(wbc),]
+```
+
+## Histogram
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+inputPanel(
+  
+  selectInput(inputId = "n_breaks", label = "Number of bins:",
+              choices = c(10, 20, 35, 50), selected = 20),
+  
+  sliderInput(inputId = "bw_adjust", label = "Bandwidth adjustment:",
+              min = 0.2, max = 2, value = 1, step = 0.2,
+              animate = animationOptions(interval = 1000, loop = TRUE, 
+                                         playButton = NULL, pauseButton = NULL))
+  )
+
+renderPlot({
+  hist1 <- histogram(wbc$gni_log, type = "density", 
+            breaks = as.numeric(input$n_breaks), col = "white",
+       xlab = "Logarithm of GNI", ylab = "Density", 
+       main = "World bank data GNI values")
+
+  dens1 <- densityplot(wbc$gni_log, adjust = input$bw_adjust, na.rm = TRUE, 
+              col = "darkgreen", lwd = 3.0, plot.points = FALSE)
+  
+  plot1 <- hist1 + as.layer(dens1)
+
+  hist2 <- histogram(wbc$co2_log, type = "density", 
+            breaks = as.numeric(input$n_breaks), col = "white",
+       xlab = "Logarithm of CO2", ylab = "Density", 
+       main = "World bank data CO2 values")
+
+  dens2 <- densityplot(wbc$co2_log, adjust = input$bw_adjust, na.rm = TRUE, 
+              col = "blue", lwd = 3.0, plot.points = FALSE)
+  
+  plot2 <- hist2 + as.layer(dens2)
+  
+  grid.arrange(plot1, plot2, ncol = 2)
+  })
+```
+
+
+## XYPlot
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+inputPanel(
+  
+  selectInput(inputId = "model_select", label = "Select model:",
+              choices = c("Linear model", "Exponential model",
+                          "Self starting logistic model", "Tolerance curve"),
+              selected = "Linear model")
+  )
+
+renderPlot({
+
+  if(input$model_select == "Linear model"){
+    # linear model
+    l_model <- lm(wbc$co2_log ~ wbc$gni_log)
+    thv <- predict.lm(l_model, wbc)
+    } 
+  else if(input$model_select == "Exponential model"){
+    f <- function(y0, x, a, b) {y0 + a * exp(b * x)}
+    exp_model <- nls(co2_log ~ f(y0, gni_log, a, b),
+                     data = wbc,
+                     start = list(y0 = 3, a = 0.5, b = 0.5)) 
+    thv <- predict(exp_model, wbc$gni_log)
+    } 
+  else if(input$model_select == "Self starting logistic model"){
+    Asym <- 1; xmid <- 1; scal <- 1
+    getInitial(co2_log ~ SSlogis(gni_log, Asym, xmid, scal), data = wbc)
+    ssl_model <- nls(co2_log ~ SSlogis(gni_log, Asym, xmid, scal), data = wbc)
+    thv <- predict(ssl_model, wbc$gni_log)
+    } 
+  else if(input$model_select == "Tolerance curve"){
+    tc_model= nls(co2_log ~ 1 + a * (gni_log^2) + b * gni_log + c, wbc,
+                  start = list(a=1, b=1, c=1))
+    thv <- predict(tc_model, wbc$gni_log)
+    }
+  
+  xyplot(wbc$co2_log[wbc$co2_log >  thv] ~ 
+           wbc$gni_log[wbc$co2_log >  thv],
+         col = "red", ylim = range(wbc$co2_log, na.rm = TRUE),
+         xlab = "Logarithm of GNI", ylab = "Logarithm of CO2", 
+         main = "World bank data values") +
+    as.layer(xyplot(wbc$co2_log[wbc$co2_log <=  thv] ~ 
+                      wbc$gni_log[wbc$co2_log <=  thv], 
+                    col = "blue")) + 
+    as.layer(xyplot(thv ~ wbc$gni_log, type = "spline", 
+                    col = "green", lwd = 5))
+  })
+```
+
+
+
+## Random forest
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+load(paste0(in_path3, "dm-es-12_02_rf.RData"))
+ndvi_original <- raster$ndvi_fogo_landsat
+prediction_original <- predict(raster, model.train[[1]])
+clrs.ndvi <- colorRampPalette(brewer.pal(8,"YlGn"))(256)
+clrs.change <- colorRampPalette(brewer.pal(11,"Spectral"))(256)
+
+inputPanel(
+  selectInput(inputId = "ndvi", label = "Change percentage NDVI:",
+              choices = seq(0, 200, 10), selected = 100)
+  )
+
+renderPlot({
+  raster$ndvi_fogo_landsat <- ndvi_original * (as.numeric(input$ndvi) / 100)
+  prediction_raster <- predict(raster, model.train[[1]])
+
+  
+  plot1 <- spplot(prediction_raster,col.regions = clrs.ndvi,
+                  colorkey = list(at = seq(0, 11, length.out = 256)),
+         main = "Predicted species richness \n based on Landsat 8 data",
+         sub = paste0("Result is based on ",input$ndvi, "% of 2014 NDVI values"),
+         scales = list(draw = TRUE))
+  change_raster = (1-prediction_raster / prediction_original) * 100
+  plot2 <- spplot(change_raster,col.regions = clrs.change, 
+                  colorkey = list(at = seq(-100, 100, length.out = 256)),
+                  main = "Percentage change in prediction \n results compared to 100% NDVI",
+                  scales = list(draw = TRUE))
+  grid.arrange(plot1, plot2, ncol = 2)
+  })
+```
