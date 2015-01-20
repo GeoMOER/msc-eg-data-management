@@ -73,7 +73,7 @@ The only thing which is not standard inside the `renderPlot` function is the
 usage of the "input" data frame since it has not been defined in the code but
 which is defined by shiny as a result from the `inputPanel` function. That's all.
 
-```{r}
+```{r, echo=FALSE, warning=FALSE, }
 inputPanel(
   
   selectInput(inputId = "n_breaks", label = "Number of bins:",
@@ -123,7 +123,7 @@ used. As you can see, the basic structure stays the same and only the behaviour
 run the model which has been chosen by the use in the drop down menu as well as
 the respective lattice plot routine for scatter plots (i.e. xyplot).
 
-```{r}
+```{r, echo=FALSE, warning=FALSE, }
 inputPanel(
   
   selectInput(inputId = "model_select", label = "Select model:",
@@ -180,7 +180,7 @@ drop down menue defined in the `inputPanel` function and the wrapping of those
 parts of the code which actually consider the user input inside the `renderPlot`
 function. 
 
-```{r}
+```{r, echo=FALSE, warning=FALSE, }
 load(paste0(in_path3, "dm-es-12_02_rf.RData"))
 ndvi_original <- raster$ndvi_fogo_landsat
 prediction_original <- predict(raster, model.train[[1]])
