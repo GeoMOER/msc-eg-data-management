@@ -19,7 +19,7 @@
 # reports to admin@environmentalinformatics-marburg.de
 
 #### General setttings #########################################################
-
+# Hallo
 if(Sys.info()["user"] == "shiny"){
   in_path1 <- "/srv/shiny-server/moc/msc-data-management/data_procd/"
   in_path2 <- "/srv/shiny-server/moc/msc-data-management/data_raw/"
